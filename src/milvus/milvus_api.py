@@ -1,6 +1,7 @@
 import sys
 import os
 import atexit
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from pymilvus import MilvusClient, DataType
 
@@ -8,12 +9,14 @@ from src.milvus.ollama_embedding import get_embeddings
 
 client = MilvusClient("./data/milvus_demo.db")
 
+
 # Register cleanup function
 def cleanup():
     try:
         client.close()
     except Exception as e:
         print(f"Error during cleanup: {e}")
+
 
 atexit.register(cleanup)
 
@@ -98,7 +101,7 @@ if __name__ == "__main__":
         # collection_list()
         print(client.has_collection(collection_name))
         # print(client.describe_collection(collection_name))
-        
+
         # insert_data(2, 'hello', collection_name)
         search_data('hi', collection_name)
     finally:

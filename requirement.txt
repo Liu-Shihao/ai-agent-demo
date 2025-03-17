@@ -1,0 +1,6 @@
+langchain-core==0.3.45
+langgraph==0.3.11
+langgraph-cli==0.1.77
+langchain-deepseek==0.1.2
+langchain-ollama==0.2.3
+pymilvus==2.5.5

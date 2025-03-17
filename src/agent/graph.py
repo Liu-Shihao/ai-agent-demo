@@ -12,8 +12,8 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from agent.state import State
 from agent.tools import human_assistance, milvus_search, amultiply
 
-tools = [human_assistance, milvus_search, amultiply]
-
+# tools = [human_assistance, milvus_search, amultiply]
+tools = [milvus_search, amultiply]
 
 async def call_model(
         state: State, config: RunnableConfig
@@ -102,13 +102,12 @@ graph_builder.add_conditional_edges(
 graph_builder.add_edge("tools", "call_model")
 
 memory = MemorySaver()
-graph = graph_builder.compile()
 
 # Compile the builder into an executable graph
 # You can customize this by adding interrupt points for state updates
 graph = graph_builder.compile(
-    interrupt_before=[],  # Add node names here to update state before they're called
-    interrupt_after=[],  # Add node names here to update state after they're called
+    # interrupt_before=[],  # Add node names here to update state before they're called
+    # interrupt_after=[],  # Add node names here to update state after they're called
     checkpointer=memory,
 )
 

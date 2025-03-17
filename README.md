@@ -17,9 +17,9 @@ langgraph dev
 ```bash
 cd src/agent-chat-ui
 
-pip install -e .
+pnpm install
 
-langgraph dev
+pnpm dev
 ```
 The app will be available at `http://localhost:5173`.
 

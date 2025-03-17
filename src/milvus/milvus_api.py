@@ -85,7 +85,9 @@ def search_data(query: str, collection_name: str):
         output_fields=["my_id", "my_content"],
         search_params={"metric_type": "COSINE"}
     )
-    print(f"search: {res}")
+    for hits in res:
+        for hit in hits:
+            print(hit)
 
 
 if __name__ == "__main__":

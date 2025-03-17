@@ -1,13 +1,13 @@
-
-from typing import Any, Dict
-
-from langchain_core.runnables import RunnableConfig
 from langgraph.graph import StateGraph
 from langchain_deepseek import ChatDeepSeek
-from agent.configuration import Configuration
-from agent.state import State
 
-model = ChatDeepSeek(
+from langgraph.prebuilt import ToolNode, tools_condition
+from agent.state import State
+from agent.tools import milvus_search, multiply
+
+tools = [milvus_search, multiply]
+
+llm = ChatDeepSeek(
     model="deepseek-chat",
     temperature=0,
     max_tokens=None,
@@ -15,21 +15,27 @@ model = ChatDeepSeek(
     max_retries=2,
 )
 
-def call_model(state, config):
-    response = model.invoke(state["messages"])
-    # We return a list, because this will get added to the existing list
-    return {"messages": [response]}
+llm_with_tools = llm.bind_tools(tools)
 
 
-# Define a new graph
-workflow = StateGraph(State, config_schema=Configuration)
+def chatbot(state: State):
+    return {"messages": [llm_with_tools.invoke(state["messages"])]}
 
-# Add the node to the graph
-workflow.add_node("call_model", call_model)
 
-# Set the entrypoint as `call_model`
-workflow.add_edge("__start__", "call_model")
+graph_builder = StateGraph(State)
 
-# Compile the workflow into an executable graph
-graph = workflow.compile()
+graph_builder.add_node("chatbot", chatbot)
+
+tool_node = ToolNode(tools=tools)
+graph_builder.add_node("tools", tool_node)
+
+graph_builder.add_conditional_edges(
+    "chatbot",
+    tools_condition,
+)
+# Any time a tool is called, we return to the chatbot to decide the next step
+graph_builder.add_edge("tools", "chatbot")
+graph_builder.set_entry_point("chatbot")
+graph = graph_builder.compile()
+
 graph.name = "New Graph"  # This defines the custom name in LangSmith

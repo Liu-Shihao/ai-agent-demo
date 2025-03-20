@@ -10,23 +10,24 @@ from langchain_core.tools import tool
 from langchain_deepseek import ChatDeepSeek
 from langgraph.prebuilt import create_react_agent
 from langgraph.types import Command
-from langchain_core.messages import convert_to_messages
+
 
 os.environ["DEEPSEEK_API_KEY"] = "..."
 os.environ["DASHSCOPE_API_KEY"] = "..."
 
-model = ChatDeepSeek(
-    model="deepseek-chat",
-    temperature=0,
-    max_tokens=None,
-    timeout=None,
-    max_retries=2,
-)
+
+# model = ChatDeepSeek(
+#     model="deepseek-chat",
+#     temperature=0,
+#     max_tokens=None,
+#     timeout=None,
+#     max_retries=2,
+# )
+
 
 model = ChatTongyi(
     model="qwen-plus"
 )
-
 
 @tool
 def add(a: int, b: int) -> int:
@@ -88,35 +89,3 @@ builder.add_node("addition_expert", addition_expert)
 builder.add_node("multiplication_expert", multiplication_expert)
 builder.add_edge(START, "addition_expert")
 graph = builder.compile()
-
-
-def pretty_print_messages(update):
-    if isinstance(update, tuple):
-        ns, update = update
-        # skip parent graph updates in the printouts
-        if len(ns) == 0:
-            return
-
-        graph_id = ns[-1].split(":")[0]
-        print(f"Update from subgraph {graph_id}:")
-        print("\n")
-
-    for node_name, node_update in update.items():
-        print(f"Update from node {node_name}:")
-        print("\n")
-
-        for m in convert_to_messages(node_update["messages"]):
-            m.pretty_print()
-        print("\n")
-
-
-if __name__ == '__main__':
-
-    user_input = "what's (3 + 5) * 12"
-    print(user_input)
-    for chunk in graph.stream(
-            {"messages": [("user", user_input)]}, subgraphs=True
-    ):
-        pretty_print_messages(chunk)
-
-    print('done.')

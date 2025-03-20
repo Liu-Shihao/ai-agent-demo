@@ -1,4 +1,5 @@
-# Agent Chat With Tools
+# LangGraph For Multi-Agent
+使用LangGraph构建多Agent应用程序
 
 ## Setup
 ```bash
@@ -15,13 +16,21 @@ langgraph dev
 
 ## Agent Chat UI
 ```bash
-cd src/react_agent-chat-ui
+cd src/agent-chat-ui
 
 pnpm install
 
 pnpm dev
 ```
 The app will be available at `http://localhost:5173`.
+
+
+# Langgraph
+
+## Multi-Agent
+
+- [Multi-agent](https://langchain-ai.github.io/langgraph/how-tos/#multi-agent)
+- [Multi-Agent Systems](https://langchain-ai.github.io/langgraph/tutorials/#multi-agent-systems)
 
 
 # Ollama 

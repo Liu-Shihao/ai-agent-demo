@@ -5,3 +5,4 @@ langchain-deepseek==0.1.2
 langchain-ollama==0.2.3
 pymilvus==2.5.5
 dashscope==1.22.2
+langchain-community==0.3.20

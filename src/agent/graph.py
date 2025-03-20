@@ -9,11 +9,12 @@ from langchain_deepseek import ChatDeepSeek
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import ToolNode, tools_condition
 
-from agent.state import State
+from agent.state import State, InputState
 from agent.tools import human_assistance, milvus_search, amultiply
 
 # tools = [human_assistance, milvus_search, amultiply]
 tools = [milvus_search, amultiply]
+
 
 async def call_model(
         state: State, config: RunnableConfig
@@ -87,7 +88,7 @@ def route_model_output(state: State) -> Literal["__end__", "tools"]:
     return "tools"
 
 
-graph_builder = StateGraph(State)
+graph_builder = StateGraph(State, input=InputState, config_schema=Configuration)
 
 graph_builder.add_node("call_model", call_model)
 

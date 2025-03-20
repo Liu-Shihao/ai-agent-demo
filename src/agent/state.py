@@ -35,6 +35,7 @@ class InputState:
     updating by ID to maintain an "append-only" state unless a message with the same ID is provided.
     """
 
+
 @dataclass
 class State(InputState):
     """Represents the complete state of the agent, extending InputState with additional attributes.

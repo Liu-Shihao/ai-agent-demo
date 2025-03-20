@@ -1,4 +1,4 @@
-"""Default prompts used by the agent."""
+"""Default prompts used by the react_agent."""
 
 SYSTEM_PROMPT = """You are a helpful AI assistant.
 

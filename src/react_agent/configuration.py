@@ -1,4 +1,4 @@
-"""Define the configurable parameters for the agent."""
+"""Define the configurable parameters for the react_agent."""
 
 from __future__ import annotations
 
@@ -7,25 +7,25 @@ from typing import Optional, Annotated
 
 from langchain_core.runnables import RunnableConfig, ensure_config
 
-from agent import prompts
+from react_agent import prompts
 
 
 @dataclass(kw_only=True)
 class Configuration:
-    """The configuration for the agent."""
+    """The configuration for the react_agent."""
 
     system_prompt: str = field(
         default=prompts.SYSTEM_PROMPT,
         metadata={
-            "description": "The system prompt to use for the agent's interactions. "
-                           "This prompt sets the context and behavior for the agent."
+            "description": "The system prompt to use for the react_agent's interactions. "
+                           "This prompt sets the context and behavior for the react_agent."
         },
     )
 
     model: Annotated[str, {"__template_metadata__": {"kind": "llm"}}] = field(
         default="deepseek-chat",
         metadata={
-            "description": "The name of the language model to use for the agent's main interactions. "
+            "description": "The name of the language model to use for the react_agent's main interactions. "
         },
     )
 

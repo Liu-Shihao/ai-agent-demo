@@ -4,7 +4,7 @@ from typing import List, Callable, Any
 from langchain_core.tools import tool
 from langgraph.types import Command, interrupt
 from pymilvus import MilvusClient
-from agent.embedding_utils import get_embeddings
+from react_agent.embedding_utils import get_embeddings
 
 client = MilvusClient("data/milvus_demo.db")
 

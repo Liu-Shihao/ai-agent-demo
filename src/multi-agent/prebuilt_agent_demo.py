@@ -1,6 +1,7 @@
 import os
 from typing import Annotated
 
+from langchain_community.chat_models import ChatTongyi
 from langchain_core.tools.base import InjectedToolCallId
 from langgraph.constants import START
 from langgraph.graph import StateGraph, MessagesState
@@ -11,7 +12,8 @@ from langgraph.prebuilt import create_react_agent
 from langgraph.types import Command
 from langchain_core.messages import convert_to_messages
 
-os.environ["DEEPSEEK_API_KEY"] = "..."
+os.environ["DEEPSEEK_API_KEY"] = "sk-fe11a424f77c4511a2fbd8c0eb7fb987"
+os.environ["DASHSCOPE_API_KEY"] = "sk-eb7f03c834cc44bb85a21162714c6da4"
 
 model = ChatDeepSeek(
     model="deepseek-chat",
@@ -19,6 +21,10 @@ model = ChatDeepSeek(
     max_tokens=None,
     timeout=None,
     max_retries=2,
+)
+
+model = ChatTongyi(
+    model="qwen-plus"
 )
 
 
@@ -45,7 +51,7 @@ def make_handoff_tool(*, agent_name: str):
             # optionally pass the current tool call ID (will be ignored by the LLM)
             tool_call_id: Annotated[str, InjectedToolCallId],
     ):
-        """Ask another agent for help."""
+        """Ask another react_agent for help."""
         tool_message = {
             "role": "tool",
             "content": f"Successfully transferred to {agent_name}",
@@ -53,11 +59,11 @@ def make_handoff_tool(*, agent_name: str):
             "tool_call_id": tool_call_id,
         }
         return Command(
-            # navigate to another agent node in the PARENT graph
+            # navigate to another react_agent node in the PARENT graph
             goto=agent_name,
             graph=Command.PARENT,
-            # This is the state update that the agent `agent_name` will see when it is invoked.
-            # We're passing agent's FULL internal message history AND adding a tool message to make sure
+            # This is the state update that the react_agent `agent_name` will see when it is invoked.
+            # We're passing react_agent's FULL internal message history AND adding a tool message to make sure
             # the resulting chat history is valid. See the paragraph above for more information.
             update={"messages": state["messages"] + [tool_message]},
         )
@@ -109,6 +115,8 @@ if __name__ == '__main__':
     user_input = "what's (3 + 5) * 12"
     print(user_input)
     for chunk in graph.stream(
-        {"messages": [("user", user_input)]}, subgraphs=True
+            {"messages": [("user", user_input)]}, subgraphs=True
     ):
         pretty_print_messages(chunk)
+
+    print('done.')

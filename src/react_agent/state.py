@@ -9,7 +9,7 @@ from typing import Annotated, Sequence
 
 @dataclass
 class InputState:
-    """Defines the input state for the agent, representing a narrower interface to the outside world.
+    """Defines the input state for the react_agent, representing a narrower interface to the outside world.
 
     This class is used to define the initial state and structure of incoming data.
     """
@@ -18,13 +18,13 @@ class InputState:
         default_factory=list
     )
     """
-    Messages tracking the primary execution state of the agent.
+    Messages tracking the primary execution state of the react_agent.
 
     Typically accumulates a pattern of:
     1. HumanMessage - user input
-    2. AIMessage with .tool_calls - agent picking tool(s) to use to collect information
+    2. AIMessage with .tool_calls - react_agent picking tool(s) to use to collect information
     3. ToolMessage(s) - the responses (or errors) from the executed tools
-    4. AIMessage without .tool_calls - agent responding in unstructured format to the user
+    4. AIMessage without .tool_calls - react_agent responding in unstructured format to the user
     5. HumanMessage - user responds with the next conversational turn
 
     Steps 2-5 may repeat as needed.
@@ -36,9 +36,9 @@ class InputState:
 
 @dataclass
 class State(InputState):
-    """Represents the complete state of the agent, extending InputState with additional attributes.
+    """Represents the complete state of the react_agent, extending InputState with additional attributes.
 
-    This class can be used to store any information needed throughout the agent's lifecycle.
+    This class can be used to store any information needed throughout the react_agent's lifecycle.
     """
 
     is_last_step: IsLastStep = field(default=False)

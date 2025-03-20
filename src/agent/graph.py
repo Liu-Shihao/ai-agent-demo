@@ -1,121 +1,91 @@
 import os
-from datetime import datetime, timezone
-from typing import Dict, List, Literal, cast
+from typing import Annotated
 
 from langchain_community.chat_models import ChatTongyi
-
-from agent.configuration import Configuration
-from langchain_core.messages import AIMessage
-from langchain_core.runnables import RunnableConfig
-from langgraph.graph import StateGraph
+from langchain_core.tools.base import InjectedToolCallId
+from langgraph.constants import START
+from langgraph.graph import StateGraph, MessagesState
+from langgraph.prebuilt import InjectedState
+from langchain_core.tools import tool
 from langchain_deepseek import ChatDeepSeek
-from langgraph.checkpoint.memory import MemorySaver
-from langgraph.prebuilt import ToolNode
+from langgraph.prebuilt import create_react_agent
+from langgraph.types import Command
 
-from agent.state import State, InputState
-from agent.tools import TOOLS
 
+os.environ["DEEPSEEK_API_KEY"] = "..."
 os.environ["DASHSCOPE_API_KEY"] = "..."
-"""
-pip install --upgrade --quiet  dashscope
-"""
 
 
-async def call_model(state: State, config: RunnableConfig) -> Dict[str, List[AIMessage]]:
-    """Call the LLM powering our "agent".
+# model = ChatDeepSeek(
+#     model="deepseek-chat",
+#     temperature=0,
+#     max_tokens=None,
+#     timeout=None,
+#     max_retries=2,
+# )
 
-    This function prepares the prompt, initializes the model, and processes the response.
 
-    Args:
-        state (State): The current state of the conversation.
-        config (RunnableConfig): Configuration for the model run.
+model = ChatTongyi(
+    model="qwen-plus"
+)
 
-    Returns:
-        dict: A dictionary containing the model's response message.
-    """
-    configuration = Configuration.from_runnable_config(config)
+@tool
+def add(a: int, b: int) -> int:
+    """Adds two numbers."""
+    return a + b
 
-    # model = ChatDeepSeek(
-    #     model=configuration.model,
-    #     temperature=0,
-    #     max_tokens=None,
-    #     timeout=None,
-    #     max_retries=2,
-    # ).bind_tools(TOOLS)
 
-    model = ChatTongyi().bind_tools(TOOLS)
+@tool
+def multiply(a: int, b: int) -> int:
+    """Multiplies two numbers."""
+    return a * b
 
-    system_message = configuration.system_prompt.format(
-        system_time=datetime.now(tz=timezone.utc).isoformat()
-    )
 
-    # Get the model's response
-    response = cast(
-        AIMessage,
-        await model.ainvoke(
-            [{"role": "system", "content": system_message}, *state.messages], config
-        ),
-    )
-    if state.is_last_step and response.tool_calls:
-        return {
-            "messages": [
-                AIMessage(
-                    id=response.id,
-                    content="Sorry, I could not find an answer to your question in the specified number of steps.",
-                )
-            ]
+def make_handoff_tool(*, agent_name: str):
+    """Create a tool that can return handoff via a Command"""
+    tool_name = f"transfer_to_{agent_name}"
+
+    @tool(tool_name)
+    def handoff_to_agent(
+            # # optionally pass current graph state to the tool (will be ignored by the LLM)
+            state: Annotated[dict, InjectedState],
+            # optionally pass the current tool call ID (will be ignored by the LLM)
+            tool_call_id: Annotated[str, InjectedToolCallId],
+    ):
+        """Ask another react_agent for help."""
+        tool_message = {
+            "role": "tool",
+            "content": f"Successfully transferred to {agent_name}",
+            "name": tool_name,
+            "tool_call_id": tool_call_id,
         }
-
-    # Return the model's response as a list to be added to existing messages
-    return {"messages": [response]}
-
-
-graph_builder = StateGraph(State, input=InputState, config_schema=Configuration)
-
-graph_builder.add_node("call_model", call_model)
-graph_builder.add_node("tools", ToolNode(TOOLS))
-
-graph_builder.add_edge("__start__", "call_model")
-
-
-def route_model_output(state: State) -> Literal["__end__", "tools"]:
-    """Determine the next node based on the model's output.
-
-    This function checks if the model's last message contains tool calls.
-
-    Args:
-        state (State): The current state of the conversation.
-
-    Returns:
-        str: The name of the next node to call ("__end__" or "tools").
-    """
-    last_message = state.messages[-1]
-    if not isinstance(last_message, AIMessage):
-        raise ValueError(
-            f"Expected AIMessage in output edges, but got {type(last_message).__name__}"
+        return Command(
+            # navigate to another react_agent node in the PARENT graph
+            goto=agent_name,
+            graph=Command.PARENT,
+            # This is the state update that the react_agent `agent_name` will see when it is invoked.
+            # We're passing react_agent's FULL internal message history AND adding a tool message to make sure
+            # the resulting chat history is valid. See the paragraph above for more information.
+            update={"messages": state["messages"] + [tool_message]},
         )
-    # If there is no tool call, then we finish
-    if not last_message.tool_calls:
-        return "__end__"
-    # Otherwise we execute the requested actions
-    return "tools"
+
+    return handoff_to_agent
 
 
-graph_builder.add_conditional_edges(
-    "call_model",
-    route_model_output,
-)
-# Any time a tool is called, we return to the chatbot to decide the next step
-graph_builder.add_edge("tools", "call_model")
-
-# memory = MemorySaver()
-
-# Compile the builder into an executable graph
-# You can customize this by adding interrupt points for state updates
-graph = graph_builder.compile(
-    # interrupt_before=[],  # Add node names here to update state before they're called
-    # interrupt_after=[],  # Add node names here to update state after they're called
-    # checkpointer=memory,
+addition_expert = create_react_agent(
+    model,
+    [add, make_handoff_tool(agent_name="multiplication_expert")],
+    prompt="You are an addition expert, you can ask the multiplication expert for help with multiplication.",
 )
 
-graph.name = "New Graph"  # This defines the custom name in LangSmith
+multiplication_expert = create_react_agent(
+    model,
+    [multiply, make_handoff_tool(agent_name="addition_expert")],
+    prompt="You are a multiplication expert, you can ask an addition expert for help with addition.",
+)
+
+builder = StateGraph(MessagesState)
+builder.add_node("addition_expert", addition_expert)
+builder.add_node("multiplication_expert", multiplication_expert)
+builder.add_edge(START, "addition_expert")
+graph = builder.compile()

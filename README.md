@@ -15,7 +15,7 @@ langgraph dev
 
 ## Agent Chat UI
 ```bash
-cd src/agent-chat-ui
+cd src/react_agent-chat-ui
 
 pnpm install
 

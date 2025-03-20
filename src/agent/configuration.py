@@ -7,8 +7,8 @@ from typing import Optional, Annotated
 
 from langchain_core.runnables import RunnableConfig, ensure_config
 
-
 from agent import prompts
+
 
 @dataclass(kw_only=True)
 class Configuration:
@@ -18,15 +18,14 @@ class Configuration:
         default=prompts.SYSTEM_PROMPT,
         metadata={
             "description": "The system prompt to use for the agent's interactions. "
-            "This prompt sets the context and behavior for the agent."
+                           "This prompt sets the context and behavior for the agent."
         },
     )
 
     model: Annotated[str, {"__template_metadata__": {"kind": "llm"}}] = field(
-        default="deepseek/deepseek-chat",
+        default="deepseek-chat",
         metadata={
             "description": "The name of the language model to use for the agent's main interactions. "
-            "Should be in the form: provider/model-name."
         },
     )
 
@@ -39,7 +38,7 @@ class Configuration:
 
     @classmethod
     def from_runnable_config(
-        cls, config: Optional[RunnableConfig] = None
+            cls, config: Optional[RunnableConfig] = None
     ) -> Configuration:
         """Create a Configuration instance from a RunnableConfig object."""
         config = ensure_config(config)

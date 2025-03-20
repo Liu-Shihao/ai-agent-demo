@@ -1,7 +1,9 @@
+import os
+
 import requests
 
-url = "https://api.deepseek.com/models"
 
+os.environ["DEEPSEEK_API_KEY"] = "..."
 
 def model_list():
     url = "https://api.deepseek.com/models"

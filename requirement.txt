@@ -7,3 +7,7 @@ pymilvus==2.5.5
 dashscope==1.22.2
 langchain-community==0.3.20
 langchain-experimental==0.3.4
+readabilipy==0.3.0
+markdownify==1.1.0
+browser-use==0.1.40
+litellm==1.63.14

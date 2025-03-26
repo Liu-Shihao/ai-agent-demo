@@ -80,9 +80,6 @@ class JinaClient:
         return response.text
 
 
-
-
-
 class ReadabilityExtractor:
     def extract_article(self, html: str) -> Article:
         article = simple_json_from_html_string(html, use_readability=True)

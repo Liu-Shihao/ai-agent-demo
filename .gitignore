@@ -3,3 +3,4 @@
 /.idea/
 /src/agent-chat-ui/node_modules/
 /src/react_agent/__pycache__/
+.env

@@ -1,7 +1,9 @@
 import asyncio
+import os
 from typing import Optional
 from contextlib import AsyncExitStack
 
+from langchain_deepseek import ChatDeepSeek
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
@@ -107,10 +109,12 @@ class MCPClient:
                 })
 
                 # Get next response from Claude
-                response = self.anthropic.messages.create(
-                    model="claude-3-5-sonnet-20241022",
-                    max_tokens=1000,
+                response = self.llm.chat.completions.create(
+                    model="deepseek-chat",
                     messages=messages,
+                    max_tokens=1024,
+                    temperature=0.1,
+                    stream=False
                 )
 
                 final_text.append(response.content[0].text)

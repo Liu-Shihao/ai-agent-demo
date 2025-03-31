@@ -1,91 +1,250 @@
 import os
-from typing import Annotated
 
-from langchain_community.chat_models import ChatTongyi
-from langchain_core.tools.base import InjectedToolCallId
-from langgraph.constants import START
-from langgraph.graph import StateGraph, MessagesState
-from langgraph.prebuilt import InjectedState
-from langchain_core.tools import tool
+from typing import TypedDict
+
+from langchain_community.tools import TavilySearchResults
+from langchain_core.language_models import BaseChatModel
+from langchain_core.messages import HumanMessage
 from langchain_deepseek import ChatDeepSeek
 from langgraph.prebuilt import create_react_agent
+from typing_extensions import Literal
+
+from langchain_community.chat_models import ChatTongyi
+from langgraph.constants import START, END
+from langgraph.graph import StateGraph, MessagesState
 from langgraph.types import Command
 
+from agent.tools import scrape_webpages, write_document, edit_document, read_document, create_outline, python_repl_tool
 
-os.environ["DEEPSEEK_API_KEY"] = "..."
-os.environ["DASHSCOPE_API_KEY"] = "..."
+"""
+https://langchain-ai.github.io/langgraph/tutorials/multi_agent/hierarchical_agent_teams/
+"""
 
-
-# model = ChatDeepSeek(
-#     model="deepseek-chat",
-#     temperature=0,
-#     max_tokens=None,
-#     timeout=None,
-#     max_retries=2,
-# )
+os.environ["DEEPSEEK_API_KEY"] = "sk-f51afd771a9b4d12b7ef308e7c25d686"
+os.environ["DASHSCOPE_API_KEY"] = "sk-a91bb251d68743c0a5e2a53a8534162c"
+os.environ["TAVILY_API_KEY"] = "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"
 
 
-model = ChatTongyi(
-    model="qwen-plus"
+tavily_tool = TavilySearchResults(max_results=5)
+
+
+class State(MessagesState):
+    next: str
+
+
+def make_supervisor_node(llm: BaseChatModel, members: list[str]) -> str:
+    options = ["FINISH"] + members
+    system_prompt = (
+        "You are a supervisor tasked with managing a conversation between the"
+        f" following workers: {members}. Given the following user request,"
+        " respond with the worker to act next. Each worker will perform a"
+        " task and respond with their results and status. When finished,"
+        " respond with FINISH."
+    )
+
+    class Router(TypedDict):
+        """Worker to route to next. If no workers needed, route to FINISH."""
+
+        next: Literal[*options]
+
+    def supervisor_node(state: State) -> Command[Literal[*members, "__end__"]]:
+        """An LLM-based router."""
+        messages = [
+                       {"role": "system", "content": system_prompt},
+                   ] + state["messages"]
+        response = llm.with_structured_output(Router).invoke(messages)
+        print(f"=============<{response}")
+        goto = response["next"]
+        if goto == "FINISH":
+            goto = END
+
+        return Command(goto=goto, update={"next": goto})
+
+    return supervisor_node
+
+
+search_llm = ChatTongyi(model="qwen-plus")
+search_agent = create_react_agent(search_llm, tools=[tavily_tool])
+
+"""
+----------------------------------------------------------------------------
+Define Research Team
+"""
+
+
+def search_node(state: State) -> Command[Literal["supervisor"]]:
+    result = search_agent.invoke(state)
+    return Command(
+        update={
+            "messages": [
+                HumanMessage(content=result["messages"][-1].content, name="search")
+            ]
+        },
+        # We want our workers to ALWAYS "report back" to the supervisor when done
+        goto="supervisor",
+    )
+
+
+web_scraper_agent = create_react_agent(search_llm, tools=[scrape_webpages])
+
+
+def web_scraper_node(state: State) -> Command[Literal["supervisor"]]:
+    result = web_scraper_agent.invoke(state)
+    return Command(
+        update={
+            "messages": [
+                HumanMessage(content=result["messages"][-1].content, name="web_scraper")
+            ]
+        },
+        # We want our workers to ALWAYS "report back" to the supervisor when done
+        goto="supervisor",
+    )
+
+
+research_supervisor_node = make_supervisor_node(search_llm, ["search", "web_scraper"])
+
+research_builder = StateGraph(State)
+research_builder.add_node("supervisor", research_supervisor_node)
+research_builder.add_node("search", search_node)
+research_builder.add_node("web_scraper", web_scraper_node)
+
+research_builder.add_edge(START, "supervisor")
+research_graph = research_builder.compile()
+
+"""
+----------------------------------------------------------------------------
+
+Define Document Writing Team
+"""
+doc_llm = ChatTongyi(model="qwen-plus")
+doc_writer_agent = create_react_agent(
+    doc_llm,
+    tools=[write_document, edit_document, read_document],
+    prompt=(
+        "You can read, write and edit documents based on note-taker's outlines. "
+        "Don't ask follow-up questions."
+    ),
 )
 
-@tool
-def add(a: int, b: int) -> int:
-    """Adds two numbers."""
-    return a + b
+
+def doc_writing_node(state: State) -> Command[Literal["supervisor"]]:
+    result = doc_writer_agent.invoke(state)
+    return Command(
+        update={
+            "messages": [
+                HumanMessage(content=result["messages"][-1].content, name="doc_writer")
+            ]
+        },
+        # We want our workers to ALWAYS "report back" to the supervisor when done
+        goto="supervisor",
+    )
 
 
-@tool
-def multiply(a: int, b: int) -> int:
-    """Multiplies two numbers."""
-    return a * b
-
-
-def make_handoff_tool(*, agent_name: str):
-    """Create a tool that can return handoff via a Command"""
-    tool_name = f"transfer_to_{agent_name}"
-
-    @tool(tool_name)
-    def handoff_to_agent(
-            # # optionally pass current graph state to the tool (will be ignored by the LLM)
-            state: Annotated[dict, InjectedState],
-            # optionally pass the current tool call ID (will be ignored by the LLM)
-            tool_call_id: Annotated[str, InjectedToolCallId],
-    ):
-        """Ask another react_agent for help."""
-        tool_message = {
-            "role": "tool",
-            "content": f"Successfully transferred to {agent_name}",
-            "name": tool_name,
-            "tool_call_id": tool_call_id,
-        }
-        return Command(
-            # navigate to another react_agent node in the PARENT graph
-            goto=agent_name,
-            graph=Command.PARENT,
-            # This is the state update that the react_agent `agent_name` will see when it is invoked.
-            # We're passing react_agent's FULL internal message history AND adding a tool message to make sure
-            # the resulting chat history is valid. See the paragraph above for more information.
-            update={"messages": state["messages"] + [tool_message]},
-        )
-
-    return handoff_to_agent
-
-
-addition_expert = create_react_agent(
-    model,
-    [add, make_handoff_tool(agent_name="multiplication_expert")],
-    prompt="You are an addition expert, you can ask the multiplication expert for help with multiplication.",
+note_taking_agent = create_react_agent(
+    doc_llm,
+    tools=[create_outline, read_document],
+    prompt=(
+        "You can read documents and create outlines for the document writer. "
+        "Don't ask follow-up questions."
+    ),
 )
 
-multiplication_expert = create_react_agent(
-    model,
-    [multiply, make_handoff_tool(agent_name="addition_expert")],
-    prompt="You are a multiplication expert, you can ask an addition expert for help with addition.",
+
+def note_taking_node(state: State) -> Command[Literal["supervisor"]]:
+    result = note_taking_agent.invoke(state)
+    return Command(
+        update={
+            "messages": [
+                HumanMessage(content=result["messages"][-1].content, name="note_taker")
+            ]
+        },
+        # We want our workers to ALWAYS "report back" to the supervisor when done
+        goto="supervisor",
+    )
+
+
+chart_generating_agent = create_react_agent(
+    doc_llm, tools=[read_document, python_repl_tool]
 )
 
-builder = StateGraph(MessagesState)
-builder.add_node("addition_expert", addition_expert)
-builder.add_node("multiplication_expert", multiplication_expert)
-builder.add_edge(START, "addition_expert")
-graph = builder.compile()
+
+def chart_generating_node(state: State) -> Command[Literal["supervisor"]]:
+    result = chart_generating_agent.invoke(state)
+    return Command(
+        update={
+            "messages": [
+                HumanMessage(
+                    content=result["messages"][-1].content, name="chart_generator"
+                )
+            ]
+        },
+        # We want our workers to ALWAYS "report back" to the supervisor when done
+        goto="supervisor",
+    )
+
+
+doc_writing_supervisor_node = make_supervisor_node(
+    doc_llm, ["doc_writer", "note_taker", "chart_generator"]
+)
+
+# Create the graph here
+paper_writing_builder = StateGraph(State)
+paper_writing_builder.add_node("supervisor", doc_writing_supervisor_node)
+paper_writing_builder.add_node("doc_writer", doc_writing_node)
+paper_writing_builder.add_node("note_taker", note_taking_node)
+paper_writing_builder.add_node("chart_generator", chart_generating_node)
+
+paper_writing_builder.add_edge(START, "supervisor")
+paper_writing_graph = paper_writing_builder.compile()
+
+"""
+----------------------------------------------------------------------------
+"""
+
+supervisor_llm = ChatDeepSeek(
+    model="deepseek-chat",
+    temperature=0,
+    max_tokens=None,
+    timeout=None,
+    max_retries=1,
+)
+# supervisor_llm = ChatTongyi(model="qwen-plus")
+teams_supervisor_node = make_supervisor_node(supervisor_llm, ["research_team", "writing_team"])
+
+
+def call_research_team(state: State) -> Command[Literal["supervisor"]]:
+    response = research_graph.invoke({"messages": state["messages"][-1]})
+    return Command(
+        update={
+            "messages": [
+                HumanMessage(
+                    content=response["messages"][-1].content, name="research_team"
+                )
+            ]
+        },
+        goto="supervisor",
+    )
+
+
+def call_paper_writing_team(state: State) -> Command[Literal["supervisor"]]:
+    response = paper_writing_graph.invoke({"messages": state["messages"][-1]})
+    return Command(
+        update={
+            "messages": [
+                HumanMessage(
+                    content=response["messages"][-1].content, name="writing_team"
+                )
+            ]
+        },
+        goto="supervisor",
+    )
+
+
+# Define the graph.
+super_builder = StateGraph(State)
+super_builder.add_node("supervisor", teams_supervisor_node)
+super_builder.add_node("research_team", call_research_team)
+super_builder.add_node("writing_team", call_paper_writing_team)
+
+super_builder.add_edge(START, "supervisor")
+graph = super_builder.compile()

@@ -19,8 +19,6 @@ pip install -e .
 langgraph dev 
 """
 
-os.environ["DASHSCOPE_API_KEY"] = "sk-a91bb251d68743c0a5e2a53a8534162c"
-
 urls = [
     "https://lilianweng.github.io/posts/2024-11-28-reward-hacking/",
     "https://lilianweng.github.io/posts/2024-07-07-hallucination/",

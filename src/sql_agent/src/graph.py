@@ -69,7 +69,7 @@ def call_get_schema(state: MessagesState):
     print(state)
     # Note that LangChain enforces that all models accept `tool_choice="any"`
     # as well as `tool_choice=<string name of tool>`.
-    llm_with_tools = llm.bind_tools([get_schema_tool], tool_choice="auto")
+    llm_with_tools = llm.bind_tools([get_schema_tool], tool_choice="any")
     response = llm_with_tools.invoke(state["messages"])
     print(response)
     return {"messages": [response]}

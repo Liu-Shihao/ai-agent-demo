@@ -7,7 +7,9 @@ from langchain_community.document_loaders import WebBaseLoader
 
 
 """
-%pip install -qU langchain-qwq
+pip install -qU langchain-qwq
+pip install --upgrade --quiet  dashscope
+%pip install -qU langchain-deepseek
 https://langchain-ai.github.io/langgraph/tutorials/rag/langgraph_agentic_rag/
 https://python.langchain.com/docs/integrations/chat/tongyi/
 https://python.langchain.com/docs/integrations/chat/tongyi/
@@ -17,12 +19,12 @@ pip install -e .
 langgraph dev 
 """
 
-os.environ["DASHSCOPE_API_KEY"] = "...."
+os.environ["DASHSCOPE_API_KEY"] = "sk-a91bb251d68743c0a5e2a53a8534162c"
 
 urls = [
     "https://lilianweng.github.io/posts/2024-11-28-reward-hacking/",
     "https://lilianweng.github.io/posts/2024-07-07-hallucination/",
-    "https://lilianweng.github.io/posts/2024-04-12-diffusion-video/",
+    # "https://lilianweng.github.io/posts/2024-04-12-diffusion-video/",
 ]
 
 docs = [WebBaseLoader(url).load() for url in urls]
@@ -53,8 +55,20 @@ retriever_tool = create_retriever_tool(
 
 from langgraph.graph import MessagesState
 
-response_model = ChatTongyi(model="qwen-plus")
+# response_model = ChatTongyi(model="qwen-plus", streaming=False, extra_body={"enable_thinking": False},)
 
+# response_model = ChatTongyi(model="qwq-plus")
+
+from langchain_deepseek import ChatDeepSeek
+
+response_model = ChatDeepSeek(
+    model="deepseek-chat",
+    temperature=0,
+    max_tokens=None,
+    timeout=None,
+    max_retries=2,
+    # other params...
+)
 
 def generate_query_or_respond(state: MessagesState):
     """Call the model to generate a response based on the current state. Given
@@ -89,13 +103,23 @@ class GradeDocuments(BaseModel):
     )
 
 
-grader_model = ChatTongyi(model="qwen-plus")
+grader_model = ChatDeepSeek(
+    model="deepseek-chat",
+    temperature=0,
+    max_tokens=None,
+    timeout=None,
+    max_retries=2,
+    # other params...
+)
 
 
 def grade_documents(
     state: MessagesState,
 ) -> Literal["generate_answer", "rewrite_question"]:
     """Determine whether the retrieved documents are relevant to the question."""
+
+    print(state)
+    print("*"*8)
     for message in state["messages"]:
         if isinstance(message, HumanMessage):
             question = message.content
@@ -149,6 +173,8 @@ GENERATE_PROMPT = (
 
 
 def generate_answer(state: MessagesState):
+
+    print(f"generate_answer messages: {state}")
     """Generate an answer."""
     for message in state["messages"]:
         if isinstance(message, HumanMessage):

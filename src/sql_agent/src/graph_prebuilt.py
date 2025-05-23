@@ -12,7 +12,6 @@ pip install -e .
 langgraph dev 
 """
 
-os.environ["DASHSCOPE_API_KEY"] = "sk-a91bb251d68743c0a5e2a53a8534162c"
 
 from langchain_community.utilities import SQLDatabase
 

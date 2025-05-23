@@ -1,25 +1,30 @@
-import os
 
-from langchain_community.chat_models import ChatTongyi
+from langchain_deepseek import ChatDeepSeek
 
 """
 pip install pymysql
 
 https://langchain-ai.github.io/langgraph/tutorials/sql-agent/
-
+https://python.langchain.com/docs/integrations/chat/deepseek/
 cd src/sql_agent
 pip install -e .
 langgraph dev 
 """
 
-os.environ["DASHSCOPE_API_KEY"] = "..."
 
 from langchain_community.utilities import SQLDatabase
 
 db_url = "mysql+pymysql://root:Lsh123456!@localhost/user?charset=utf8mb4"
 db = SQLDatabase.from_uri(db_url)
 
-llm = ChatTongyi(model="qwen-plus")
+llm = ChatDeepSeek(
+    model="deepseek-chat",
+    temperature=0,
+    max_tokens=None,
+    timeout=None,
+    max_retries=2,
+    # other params...
+)
 
 from langchain_community.agent_toolkits import SQLDatabaseToolkit
 

@@ -57,6 +57,7 @@ async def get_alerts(state: str) -> str:
         return "No active alerts for this state."
 
     alerts = [format_alert(feature) for feature in data["features"]]
+    print(alerts)
     return "\n---\n".join(alerts)
 
 

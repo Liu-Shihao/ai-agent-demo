@@ -19,7 +19,14 @@ class MCPClient:
         # Initialize session and client objects
         self.session: Optional[ClientSession] = None
         self.exit_stack = AsyncExitStack()
-        self.llm =OpenAI(api_key="<your API key>", base_url="https://api.deepseek.com")
+        # self.model = "qwen-plus"
+
+        self.llm =OpenAI(api_key=os.getenv("DEEPSEEK_API_KEY"), base_url="https://api.deepseek.com")
+
+        # self.llm =OpenAI(
+        #     api_key=os.getenv("DASHSCOPE_API_KEY"),
+        #     base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+        # )
 
 
     async def connect_to_server(self, server_script_path: str):
@@ -86,7 +93,7 @@ class MCPClient:
         # Process response and handle tool calls
         final_text = []
 
-        for content in response.content:
+        for content in response.choices[0].message:
             if content.type == 'text':
                 final_text.append(content.text)
             elif content.type == 'tool_use':
@@ -117,7 +124,7 @@ class MCPClient:
                     stream=False
                 )
 
-                final_text.append(response.content[0].text)
+                final_text.append(response.choices[0].message.content)
 
         return "\n".join(final_text)
 
@@ -161,3 +168,4 @@ if __name__ == "__main__":
     import sys
 
     asyncio.run(main())
+#     What are the weather alerts in California?
